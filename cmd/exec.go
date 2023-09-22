@@ -50,6 +50,7 @@ type Config struct {
 	PasswordFile string
 	Timeout      uint32
 	Count        uint32
+	Reconnect    bool
 	PrintVersion bool
 	Verbose      int
 }
@@ -107,7 +108,9 @@ func (m *MQTTClient) subscribeOnConnect(client MQTT.Client) {
 
 func (m *MQTTClient) connectionLost(_ MQTT.Client, reason error) {
 	MQTT.WARN.Printf("Connection Lost: %s\n", reason)
-	os.Exit(1)
+	if !c.Reconnect {
+		os.Exit(1)
+	}
 }
 
 func (m *MQTTClient) onMessageReceived(_ MQTT.Client, message MQTT.Message) {
@@ -135,6 +138,7 @@ func init() {
 	rootCmd.Flags().Uint32Var(&c.Timeout, "timeout", 0, "Provide a timeout as an integer number of seconds. mqtt_sub will stop processing messages and disconnect after this number of seconds has passed.")
 	rootCmd.Flags().Uint32Var(&c.Count, "count", 0, "Disconnect and exit the program immediately after the given count of messages have been received.")
 	rootCmd.Flags().CountVarP(&c.Verbose, "verbose", "v", "Enable verbose logging. Can be specified multiple times.")
+	rootCmd.Flags().BoolVar(&c.Reconnect, "reconnect", true, "Reconnect on connection loss")
 	rootCmd.Flags().BoolVar(&c.PrintVersion, "version", false, "Print version")
 }
 
@@ -161,7 +165,14 @@ func run(_ *cobra.Command, _ []string) error {
 	opts.SetCleanSession(false)
 	opts.SetClientID(getRandomClientId())
 	opts.SetKeepAlive(time.Second * 60)
-	opts.SetAutoReconnect(true)
+	if c.Reconnect {
+		opts.SetConnectRetry(true)
+		opts.SetAutoReconnect(true)
+		opts.SetConnectRetryInterval(time.Millisecond * 250)
+		opts.SetMaxReconnectInterval(time.Second * 30)
+	} else {
+		opts.SetAutoReconnect(false)
+	}
 	opts.AddBroker(fmt.Sprintf("tcp://%s:%d", c.Host, c.Port))
 	if len(c.Username) > 0 {
 		opts.SetUsername(c.Username)
