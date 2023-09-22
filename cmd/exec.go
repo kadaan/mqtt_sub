@@ -161,6 +161,7 @@ func run(_ *cobra.Command, _ []string) error {
 	opts.SetCleanSession(false)
 	opts.SetClientID(getRandomClientId())
 	opts.SetKeepAlive(time.Second * 60)
+	opts.SetAutoReconnect(true)
 	opts.AddBroker(fmt.Sprintf("tcp://%s:%d", c.Host, c.Port))
 	if len(c.Username) > 0 {
 		opts.SetUsername(c.Username)

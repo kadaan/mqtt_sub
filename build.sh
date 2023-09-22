@@ -73,7 +73,8 @@ function download_gocilinter() {
 function download_gox() {
   if [[ ! -x "$(command -v $GOX)" ]]; then
     verbose "   --> $GOX"
-    go get github.com/mitchellh/gox || fatal "go get 'github.com/mitchellh/gox' failed: $?"
+    go install github.com/mitchellh/gox || fatal "go get 'github.com/mitchellh/gox' failed: $?"
+    goenv rehash
   fi
 }
 
