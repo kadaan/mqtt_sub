@@ -70,6 +70,7 @@ type MQTTClient struct {
 func (m *MQTTClient) connect() (MQTT.Client, error) {
 	if !m.stopped {
 		m.Client = MQTT.NewClient(m.Opts)
+		m.Client.AddRoute(c.Topic, m.onMessageReceived)
 		if token := m.Client.Connect(); token.Wait() && token.Error() != nil {
 			return nil, token.Error()
 		}
@@ -102,11 +103,13 @@ func (m *MQTTClient) subscribeOnConnect(client MQTT.Client) {
 			qos = 1
 		}
 		token := client.Subscribe(m.Topic, qos, m.onMessageReceived)
-		token.Wait()
-		if token.Error() != nil {
-			MQTT.CRITICAL.Printf("Failed to subscribe to %s: %s", m.Topic, token.Error())
-			os.Exit(1)
-		}
+		go func() {
+			_ = token.Wait()
+			if token.Error() != nil {
+				MQTT.CRITICAL.Printf("Failed to subscribe to %s: %s", m.Topic, token.Error())
+				os.Exit(1)
+			}
+		}()
 	}
 }
 
@@ -173,7 +176,7 @@ func run(_ *cobra.Command, _ []string) error {
 	} else {
 		opts.SetClientID(getRandomClientId())
 	}
-	opts.SetKeepAlive(time.Second * 60)
+	opts.SetKeepAlive(time.Second * 10)
 	if c.Reconnect {
 		opts.SetConnectRetry(true)
 		opts.SetAutoReconnect(true)
