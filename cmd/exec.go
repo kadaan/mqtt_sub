@@ -16,13 +16,12 @@
 package cmd
 
 import (
+	"crypto/rand"
 	"fmt"
 	MQTT "github.com/eclipse/paho.mqtt.golang"
 	"github.com/kadaan/mqtt_sub/version"
 	"github.com/spf13/cobra"
-	"io/ioutil"
 	"log"
-	"math/rand"
 	"os"
 	"os/signal"
 	"sync"
@@ -48,6 +47,7 @@ type Config struct {
 	Topic        string
 	Username     string
 	PasswordFile string
+	ClientId     string
 	Timeout      uint32
 	Count        uint32
 	Reconnect    bool
@@ -97,7 +97,11 @@ func (m *MQTTClient) shutdown() {
 
 func (m *MQTTClient) subscribeOnConnect(client MQTT.Client) {
 	if !m.stopped {
-		token := client.Subscribe(m.Topic, 0, m.onMessageReceived)
+		var qos byte = 0
+		if c.Reconnect {
+			qos = 1
+		}
+		token := client.Subscribe(m.Topic, qos, m.onMessageReceived)
 		token.Wait()
 		if token.Error() != nil {
 			MQTT.CRITICAL.Printf("Failed to subscribe to %s: %s", m.Topic, token.Error())
@@ -129,12 +133,13 @@ func (m *MQTTClient) onMessageReceived(_ MQTT.Client, message MQTT.Message) {
 func init() {
 	rootCmd.SetVersionTemplate(version.Print())
 	rootCmd.Flags().StringVar(&c.Host, "host", "localhost", "Specify the host to connect to.")
+	_ = rootCmd.MarkFlagRequired("host")
 	rootCmd.Flags().Uint16Var(&c.Port, "port", 1883, "Connect to the port specified.")
 	rootCmd.Flags().StringVar(&c.Topic, "topic", "", "The MQTT topic to subscribe to.")
-	_ = rootCmd.MarkFlagRequired("host")
 	rootCmd.Flags().StringVar(&c.Username, "username", "", "Provide a username to be used for authenticating with the broker.")
 	rootCmd.Flags().StringVar(&c.PasswordFile, "password-file", "", "Provide a path to a file containing a password to be used for authenticating with the broker.")
 	_ = rootCmd.MarkFlagFilename("password-file")
+	rootCmd.Flags().StringVar(&c.ClientId, "client-id", "", "The client id for the subscription.")
 	rootCmd.Flags().Uint32Var(&c.Timeout, "timeout", 0, "Provide a timeout as an integer number of seconds. mqtt_sub will stop processing messages and disconnect after this number of seconds has passed.")
 	rootCmd.Flags().Uint32Var(&c.Count, "count", 0, "Disconnect and exit the program immediately after the given count of messages have been received.")
 	rootCmd.Flags().CountVarP(&c.Verbose, "verbose", "v", "Enable verbose logging. Can be specified multiple times.")
@@ -163,7 +168,11 @@ func run(_ *cobra.Command, _ []string) error {
 
 	opts := MQTT.NewClientOptions()
 	opts.SetCleanSession(false)
-	opts.SetClientID(getRandomClientId())
+	if len(c.ClientId) > 0 {
+		opts.SetClientID(c.ClientId)
+	} else {
+		opts.SetClientID(getRandomClientId())
+	}
 	opts.SetKeepAlive(time.Second * 60)
 	if c.Reconnect {
 		opts.SetConnectRetry(true)
@@ -178,7 +187,7 @@ func run(_ *cobra.Command, _ []string) error {
 		opts.SetUsername(c.Username)
 	}
 	if len(c.PasswordFile) > 0 {
-		if content, err := ioutil.ReadFile(c.PasswordFile); err != nil {
+		if content, err := os.ReadFile(c.PasswordFile); err != nil {
 			return err
 		} else {
 			opts.SetPassword(string(content))
