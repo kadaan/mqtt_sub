@@ -61,7 +61,7 @@ PLATFORM=$(get_platform)
 GOX="gox"
 GOCILINTER=${BINARY_DIR}/golangci-lint
 GOCILINTER_URL=https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh
-GOCILINTER_VERSION=v1.43.0
+GOCILINTER_VERSION=v1.55.2
 
 function download_gocilinter() {
   if [[ ! -f "$GOCILINTER" ]]; then
