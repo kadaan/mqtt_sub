@@ -98,7 +98,7 @@ func (m *MQTTClient) shutdown() {
 func (m *MQTTClient) subscribeOnConnect(client MQTT.Client) {
 	if !m.stopped {
 		var qos byte = 0
-		if c.Reconnect {
+		if len(c.ClientId) > 0 && c.Reconnect {
 			qos = 1
 		}
 		token := client.Subscribe(m.Topic, qos, m.onMessageReceived)
